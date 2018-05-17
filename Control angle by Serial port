@@ -62,8 +62,8 @@ void encoderFeedbackPosition()
       pos++;
     }
   }
-  //MotorPositionFB = pos *360 / 100;
-  MotorPositionFB = pos * 4;
+  MotorPositionFB = pos *360 / 100;
+  //MotorPositionFB = pos * 4;
   encoder_A_prev = channel_A;
 }
 
@@ -118,8 +118,4 @@ void loop() {
     //Serial.println(digitalRead(pin_B));
 
     Serial.println(MotorPositionFB);
-    /*Serial.print(PreMotorPosition);
-    Serial.print(",");
-    Serial.print(MotorPositionINPUT);
-    Serial.print(",");*/
 }
