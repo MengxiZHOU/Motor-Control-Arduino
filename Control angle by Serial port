@@ -53,17 +53,17 @@ void encoderFeedbackPosition()
   channel_A = digitalRead(pin_A);
   if((encoder_A_prev == HIGH)&&(channel_A == LOW))
   {
-    if(digitalRead(pin_B)==HIGH)         // CW
+    if(digitalRead(pin_B)==HIGH)         // CCW
     {
       pos--;
     }
-    else                                // CCW
+    else                                // CW
     {
       pos++;
     }
   }
   MotorPositionFB = pos *360 / 100;
-  //MotorPositionFB = pos * 4;
+  //MotorPositionFB = pos * 4;          
   encoder_A_prev = channel_A;
 }
 
