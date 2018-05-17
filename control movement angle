@@ -1,0 +1,125 @@
+/*****************************************************
+MOTOR CONTROLLING WITH ENCODER FEEDBACK
+
+MotorPosition : Angle between platform and the ground 
+                -90 degree - 0 degree - 90 degree
+
+******************************************************/
+
+#include <EEPROM.h>
+
+/*MECHANICAL DESIGN*/
+float shaft_d = 0.15;                // shaft connecting to the motor shaft
+int encoderResolution = 100;          // resolution:100ppr->speed_max:15000rpm
+
+/*ARDUINO PINS*/
+int MotorControl_R = 7;             // digital output - clockwise
+int MotorControl_L = 8;             // digital output - counter-clockwise
+int MotorControl_pwm = 3;           // pwm enable - pwm signal - analog
+int pin_A = 12;                 // encoder input channel A
+int pin_B = 13;                 // encoder input channel B
+
+ /*Input Values of Encoder*/
+int channel_A = 0;
+int channel_B;
+int encoder_A_prev = 0;
+int MotorPositionFB = 0;              // Feedback postion in degrees by counting Channel A Signal
+
+/*Input values*/
+int MotorPositionINPUT;             // INPUT FROM GAME angle [-90,90] in degree
+int PreMotorPosition = 0;
+int pos = 0;
+String str_input;
+
+int PosDeadZone = 5;
+int pwmOUTPUT = 255;
+
+
+void setup() {
+
+  pinMode(MotorControl_R, OUTPUT);
+  pinMode(MotorControl_L, OUTPUT);
+  pinMode(MotorControl_pwm, OUTPUT);
+
+  pinMode(pin_A, INPUT);
+  pinMode(pin_B, INPUT);
+
+  Serial.begin(57600);
+
+}
+
+void encoderFeedbackPosition()
+{
+  channel_A = digitalRead(pin_A);
+  if((encoder_A_prev == HIGH)&&(channel_A == LOW))
+  {
+    if(digitalRead(pin_B)==HIGH)         // CW
+    {
+      pos--;
+    }
+    else                                // CCW
+    {
+      pos++;
+    }
+  }
+  //MotorPositionFB = pos *360 / 100;
+  MotorPositionFB = pos * 4;
+  encoder_A_prev = channel_A;
+}
+
+void motorStop()
+{
+  analogWrite(MotorControl_pwm, 0);
+  digitalWrite(MotorControl_R, LOW);
+  digitalWrite(MotorControl_L, LOW);
+}
+
+
+
+void setDirection()               // 0:BREAK 1:CLOCKWISE -1:COUNTER-CLOCKWISE
+{
+    if (MotorPositionINPUT > (MotorPositionFB + PosDeadZone))
+    {
+      digitalWrite(MotorControl_R, HIGH);
+      digitalWrite(MotorControl_L, LOW);
+      analogWrite(MotorControl_pwm, pwmOUTPUT);
+    }
+    else if (MotorPositionINPUT < (MotorPositionFB - PosDeadZone))
+    {
+      digitalWrite(MotorControl_R, LOW);
+      digitalWrite(MotorControl_L, HIGH);
+      analogWrite(MotorControl_pwm, pwmOUTPUT);
+    }
+    else
+    {
+      while(Serial.available()>0)
+      {
+        char byte_input = Serial.read();
+        str_input += byte_input;
+        if(byte_input == '=')
+        {
+          MotorPositionINPUT = str_input.toInt();
+          PreMotorPosition = MotorPositionINPUT; 
+          str_input = "";
+        }     
+      }
+      motorStop();
+    }
+}
+
+void loop() {
+  
+    encoderFeedbackPosition(); 
+       
+    setDirection();
+    
+    //Serial.print(channel_A);
+    //Serial.print(",");
+    //Serial.println(digitalRead(pin_B));
+
+    Serial.println(MotorPositionFB);
+    /*Serial.print(PreMotorPosition);
+    Serial.print(",");
+    Serial.print(MotorPositionINPUT);
+    Serial.print(",");*/
+}
