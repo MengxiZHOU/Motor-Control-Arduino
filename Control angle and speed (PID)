@@ -1,6 +1,6 @@
-/******************************************
-MOTOR CONTROLLING WITH ENCODER FEEDBACK
-******************************************/
+/******************************************************
+MOTOR CONTROLLING WITH ENCODER FEEDBACK (NOT COMPLETED)
+*******************************************************/
 
 #include <EEPROM.h>
 #include <PID_v1.h>
