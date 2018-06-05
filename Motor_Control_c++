@@ -1,0 +1,154 @@
+#include "Arduino.h"
+#include "MotorControl.h"
+#include "SpeedDetection.h"
+
+MotorInorder motorA(7,8,6);
+EncoderFB encoderA(2,3);
+
+void setup() {
+
+  pinMode(motorA.outputPin.motorctrl_R, OUTPUT);
+  pinMode(motorA.outputPin.motorctrl_L, OUTPUT);
+  pinMode(motorA.outputPin.pwm, OUTPUT);
+
+  pinMode(encoderA.inChannel.channel_a, INPUT);
+  pinMode(encoderA.inChannel.channel_b, INPUT);
+
+  attachInterrupt(digitalPinToInterrupt(encoderA.inChannel.channel_a), getPosA, RISING);
+  
+  Serial.begin(250000);
+  
+  IncomingString::reset();
+}
+
+void loop() {
+  SpeedDetector::getStartTime();
+  while(!motorA.setDirection(motorA.MotorPositionINPUT,encoderA.MotorPositionFB)){    // speed detection
+    motorA.changeState(true);
+  } 
+  SpeedDetector::getSpeed(encoderA.MotorPositionFB, motorA.motorState);    // speed detection
+  /*Serial.print(motorA.MotorPositionINPUT);
+  Serial.print(',');
+  Serial.println(encoderA.MotorPositionFB);*/
+  motorA.changeState(false);
+  while(Serial.available()>0){
+    char inChar = (char)Serial.read();
+    if(IncomingString::append(inChar)){
+      if(IncomingCommand::isValidNumber(IncomingString::str)){
+        motorA.MotorPositionINPUT = IncomingCommand::toFloatInput(IncomingString::str);
+        IncomingString::reset();
+        return;
+      }
+    }    
+  }
+}
+
+/*****************************************************
+*************          METHODS          **************
+******************************************************/
+
+void getPosA() {
+  if(digitalRead(encoderA.inChannel.channel_b)==HIGH) posCNT_interrupt++;
+  else posCNT_interrupt--;
+  encoderA.MotorPositionFB = posCNT_interrupt * 360 / EncoderResolution;
+}
+
+EncoderFB::EncoderFB(int pin_a, int pin_b){
+  inChannel.channel_a = pin_a;
+  inChannel.channel_b = pin_b;
+}
+
+MotorInorder::MotorInorder(int pin_r, int pin_l, int pin_p){
+  outputPin.motorctrl_R = pin_r;
+  outputPin.motorctrl_L = pin_l;
+  outputPin.pwm = pin_p;
+}
+
+bool MotorInorder::setDirection(float posin, float posfb){
+  if(posin > (posfb + PosDeadZone)){
+    digitalWrite(outputPin.motorctrl_R, HIGH);
+    digitalWrite(outputPin.motorctrl_L, LOW);
+    analogWrite(outputPin.pwm, pwmOUTPUT);
+    return false;
+  }
+  else if(posin < (posfb - PosDeadZone)){
+    digitalWrite(outputPin.motorctrl_R, LOW);
+    digitalWrite(outputPin.motorctrl_L, HIGH);
+    analogWrite(outputPin.pwm, pwmOUTPUT);
+    return false;
+  }
+  else{
+    analogWrite(outputPin.pwm, 0);
+    analogWrite(outputPin.motorctrl_R, LOW);
+    analogWrite(outputPin.motorctrl_L, LOW);
+        
+    return true;
+  } 
+}
+
+void MotorInorder::changeState(bool state) {
+  if(state == true) motorState = true;
+  else motorState = false;
+}
+
+void IncomingString::reset() {
+  isReady = false;
+  hasPayload = false;
+  str = "";
+  payload = "";
+}
+
+bool IncomingString::append(char c) {
+  if (c == '\n' || c == ' ') {
+    isReady = true;
+    return true;
+  }
+  else{
+    str += c;
+    return false;      
+  }
+}
+
+bool IncomingCommand::isValidNumber(String str){
+  if(!(str.charAt(0) == '+' || str.charAt(0) == '-' || isDigit(str.charAt(0)))) return false;
+  for(byte i=1;i<str.length();i++){
+    if(!(isDigit(str.charAt(i)) || str.charAt(i)=='.')) return false;
+    if(str.charAt(i) == '.'){
+      if(decPt) return false;
+      else decPt == true;
+    }
+  }
+  return true;
+}
+
+float IncomingCommand::toFloatInput(String str){
+  int myStringLength = str.length()+1;
+  char myChar[myStringLength];
+  str.toCharArray(myChar,myStringLength);
+  commandF = atof(myChar);
+  return commandF;
+}
+
+bool SpeedDetector::getSpeed(float degFB,bool state) {
+  if(state == false) return;
+  unsigned long TimeElapsed = millis() - startTime;      // get elapsed time - ms
+  RPM = 60 / (TimeElapsed * 360 / abs(degFB-degPrev) / 1000) ;   
+  LinearSpeed =  ShaftLength * RPM * 0.10472 * 1000;     // unit:mm/s
+
+  float ang = degFB-degPrev;
+  
+  Serial.print("Rotated Angle(Degree):");
+  Serial.println(ang);
+  Serial.print("Motor Speed(RPM): ");
+  Serial.println(RPM);
+  Serial.print("Motor Linear Speed(mm/s): "); 
+  Serial.println(LinearSpeed);
+  
+  degPrev = degFB;
+  bool doneGetSpeed = false;
+  return doneGetSpeed;  
+}
+
+void SpeedDetector::getStartTime() {
+  startTime = millis();  
+}
